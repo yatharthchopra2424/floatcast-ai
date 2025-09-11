@@ -15,6 +15,9 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        ocean: "bg-gradient-ocean text-white shadow-ocean hover:shadow-float transition-wave",
+        hero: "bg-gradient-hero text-white shadow-ocean hover:scale-105 transition-wave px-8 py-3 text-lg font-semibold",
+        float: "bg-ocean-accent text-white hover:bg-ocean-accent/90 shadow-float transition-wave",
       },
       size: {
         default: "h-10 px-4 py-2",

@@ -47,6 +47,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        ocean: {
+          deep: "hsl(var(--ocean-deep))",
+          primary: "hsl(var(--ocean-primary))",
+          light: "hsl(var(--ocean-light))",
+          accent: "hsl(var(--ocean-accent))",
+          surface: "hsl(var(--ocean-surface))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -62,6 +69,18 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      backgroundImage: {
+        'gradient-ocean': 'var(--gradient-ocean)',
+        'gradient-depth': 'var(--gradient-depth)',
+        'gradient-hero': 'var(--gradient-hero)',
+      },
+      boxShadow: {
+        'ocean': 'var(--shadow-ocean)',
+        'float': 'var(--shadow-float)',
+      },
+      transitionTimingFunction: {
+        'wave': 'var(--transition-wave)',
       },
       keyframes: {
         "accordion-down": {
