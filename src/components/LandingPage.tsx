@@ -79,6 +79,9 @@ const LandingPage = () => {
               <span className="text-2xl font-bold text-ocean-deep">FloatChat</span>
             </div>
             <div className="flex items-center space-x-4">
+              <Link to="/about">
+                <Button variant="ghost">About</Button>
+              </Link>
               <Badge variant="secondary" className="text-ocean-primary">
                 AI-Powered Ocean Data
               </Badge>
