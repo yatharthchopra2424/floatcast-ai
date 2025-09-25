@@ -12,9 +12,14 @@ import {
   TrendingUp, 
   Map, 
   Database,
-  Sparkles
+  Sparkles,
+  AlertCircle,
+  Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { streamChatCompletion, OCEAN_EXPERT_PROMPT, ChatMessage } from "@/lib/openaiClient";
+import { trimConversationHistory, calculateConversationTokens } from "@/lib/tokenManager";
+import MessageContent from "./MessageContent";
 
 interface Message {
   id: string;
@@ -22,13 +27,15 @@ interface Message {
   sender: 'user' | 'bot';
   timestamp: Date;
   type?: 'text' | 'visualization' | 'data';
+  isStreaming?: boolean;
+  error?: string;
 }
 
 const ChatBox = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Hello! I'm your AI oceanographer. I can help you explore ARGO ocean data using natural language. Try asking me something like 'Show me temperature profiles in the Pacific Ocean' or 'What's the average salinity near the equator?'",
+      content: "Hello! I'm your AI oceanographer with expertise in ARGO float data and marine science. I can provide detailed analysis with specific numeric values, depth profiles, temperature/salinity measurements, and oceanographic insights. Ask me about ocean conditions, ARGO data, or any marine phenomena!",
       sender: 'bot',
       timestamp: new Date(),
       type: 'text'
@@ -36,14 +43,17 @@ const ChatBox = () => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([
+    { role: 'system', content: OCEAN_EXPERT_PROMPT }
+  ]);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const exampleQueries = [
-    "Show me temperature profiles in the Indian Ocean for last month",
-    "What's the average salinity in the Atlantic Ocean?",
-    "Display ARGO float trajectories near Antarctica",
-    "Find temperature anomalies in the Pacific Ocean"
+    "What's the current temperature profile at 2000m depth in the North Atlantic?",
+    "Show me salinity measurements between 30-35 PSU in the Indian Ocean",
+    "What are the specific ARGO float readings near the Antarctic Circumpolar Current?",
+    "Give me exact temperature anomalies with numeric values for the Pacific warm pool"
   ];
 
   useEffect(() => {
@@ -53,38 +63,105 @@ const ChatBox = () => {
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isLoading) return;
 
+    const userInput = inputValue;
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: inputValue,
+      content: userInput,
       sender: 'user',
       timestamp: new Date(),
       type: 'text'
     };
 
+    // Add user message to UI
     setMessages(prev => [...prev, userMessage]);
     setInputValue("");
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `I understand you're asking about "${inputValue}". Based on the latest ARGO data, I've found relevant oceanographic information. This is a simulation - in the full system, I would query our database and generate interactive visualizations showing temperature profiles, salinity measurements, and float trajectories for your specific request.`,
-        sender: 'bot',
-        timestamp: new Date(),
-        type: inputValue.toLowerCase().includes('show') || inputValue.toLowerCase().includes('display') ? 'visualization' : 'text'
-      };
+    // Create streaming bot message placeholder
+    const botMessageId = (Date.now() + 1).toString();
+    const botMessage: Message = {
+      id: botMessageId,
+      content: "",
+      sender: 'bot',
+      timestamp: new Date(),
+      type: 'text',
+      isStreaming: true
+    };
 
-      setMessages(prev => [...prev, botResponse]);
-      setIsLoading(false);
+    setMessages(prev => [...prev, botMessage]);
 
+    try {
+      // Add user message to conversation history
+      const updatedHistory: ChatMessage[] = [...conversationHistory, { role: 'user', content: userInput }];
+      
+      // Trim conversation history if it exceeds token limit
+      const trimmedHistory = trimConversationHistory(updatedHistory, 100000) as ChatMessage[];
+      
+      // Log token usage
+      const tokenCount = calculateConversationTokens(trimmedHistory);
+      console.log(`Conversation tokens: ${tokenCount}`);
+
+      // Stream the response
+      await streamChatCompletion(
+        trimmedHistory,
+        (response) => {
+          if (response.error) {
+            // Handle error
+            setMessages(prev => prev.map(msg => 
+              msg.id === botMessageId 
+                ? { ...msg, content: "I apologize, but I encountered an error processing your request. Please check your API key configuration and try again.", isStreaming: false, error: response.error }
+                : msg
+            ));
+            toast({
+              title: "Error",
+              description: "Failed to get response from AI model",
+              variant: "destructive"
+            });
+          } else {
+            // Update streaming message
+            setMessages(prev => prev.map(msg => 
+              msg.id === botMessageId 
+                ? { 
+                    ...msg, 
+                    content: response.content, 
+                    isStreaming: !response.isComplete,
+                    type: response.content.toLowerCase().includes('temperature') || 
+                          response.content.toLowerCase().includes('salinity') || 
+                          response.content.toLowerCase().includes('depth') ? 'data' : 'text'
+                  }
+                : msg
+            ));
+
+            if (response.isComplete) {
+              // Add assistant response to conversation history
+              const finalHistory: ChatMessage[] = [...trimmedHistory, { role: 'assistant', content: response.content }];
+              setConversationHistory(finalHistory);
+              
+              toast({
+                title: "Ocean Analysis Complete",
+                description: "AI oceanographer has analyzed your request with numeric insights",
+              });
+            }
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Chat error:', error);
+      setMessages(prev => prev.map(msg => 
+        msg.id === botMessageId 
+          ? { ...msg, content: "I apologize, but I'm having trouble connecting to the AI service. Please check your internet connection and API configuration.", isStreaming: false, error: error instanceof Error ? error.message : 'Unknown error' }
+          : msg
+      ));
       toast({
-        title: "Query Processed",
-        description: "AI has analyzed your ocean data request.",
+        title: "Connection Error",
+        description: "Unable to connect to AI service",
+        variant: "destructive"
       });
-    }, 2000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleExampleClick = (query: string) => {
@@ -101,36 +178,48 @@ const ChatBox = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Chat Header */}
-      <div className="border-b border-border p-4 bg-card">
+      <div className="border-b border-ocean-light/30 p-4 bg-gradient-to-r from-ocean-deep to-blue-900">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-ocean rounded-full flex items-center justify-center">
-              <Bot className="h-5 w-5 text-white" />
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-white/20 to-white/10 rounded-full flex items-center justify-center border border-white/20 backdrop-blur-sm">
+              <Bot className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h3 className="font-semibold text-ocean-deep">Ocean AI Assistant</h3>
-              <p className="text-sm text-muted-foreground">Ask questions about ARGO ocean data</p>
+              <h3 className="font-bold text-white text-lg">AI Oceanographer</h3>
+              <p className="text-ocean-light text-sm flex items-center">
+                <Database className="h-3 w-3 mr-1" />
+                Real-time ARGO data • Satellite observations • Expert analysis
+              </p>
             </div>
           </div>
-          <Badge variant="secondary" className="text-ocean-primary">
-            <Sparkles className="h-3 w-3 mr-1" />
-            Online
-          </Badge>
+          <div className="flex items-center space-x-2">
+            <Badge className="text-green-700 bg-green-100/90 border-green-200">
+              <Sparkles className="h-3 w-3 mr-1" />
+              Online
+            </Badge>
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          </div>
         </div>
       </div>
 
       {/* Example Queries */}
       {messages.length === 1 && (
-        <div className="p-4 border-b border-border bg-ocean-surface">
-          <h4 className="text-sm font-medium text-ocean-deep mb-3">Try these example queries:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div className="p-6 border-b border-ocean-light/20 bg-gradient-to-br from-ocean-surface/50 to-white">
+          <h4 className="text-sm font-semibold text-ocean-deep mb-4 flex items-center">
+            <TrendingUp className="h-4 w-4 mr-2 text-ocean-primary" />
+            Try these oceanographic queries:
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {exampleQueries.map((query, index) => (
               <button
                 key={index}
                 onClick={() => handleExampleClick(query)}
-                className="text-left p-2 rounded-lg bg-card hover:bg-ocean-light transition-wave text-sm"
+                className="text-left p-3 rounded-xl bg-white/80 hover:bg-white hover:shadow-md transition-all duration-200 text-sm border border-ocean-light/30 hover:border-ocean-primary/30 group"
               >
-                "{query}"
+                <div className="flex items-start space-x-2">
+                  <div className="w-2 h-2 bg-ocean-primary rounded-full mt-2 group-hover:animate-pulse"></div>
+                  <span className="text-ocean-deep/80 group-hover:text-ocean-deep">"{query}"</span>
+                </div>
               </button>
             ))}
           </div>
@@ -138,33 +227,59 @@ const ChatBox = () => {
       )}
 
       {/* Messages */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
-        <div className="space-y-4">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-6 bg-gradient-to-b from-white to-ocean-surface/20">
+        <div className="space-y-6 max-w-4xl mx-auto">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`flex max-w-[80%] ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+              <div className={`flex ${message.sender === 'user' ? 'max-w-[70%]' : 'max-w-[95%]'} ${message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start space-x-3`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ${
                   message.sender === 'user' 
-                    ? 'bg-primary ml-3' 
-                    : 'bg-gradient-ocean mr-3'
+                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 ml-3' 
+                    : 'bg-gradient-to-br from-ocean-primary to-ocean-deep mr-3'
                 }`}>
                   {message.sender === 'user' ? (
-                    <User className="h-4 w-4 text-white" />
+                    <User className="h-5 w-5 text-white" />
                   ) : (
-                    <Bot className="h-4 w-4 text-white" />
+                    <Bot className="h-5 w-5 text-white" />
                   )}
                 </div>
                 
-                <Card className={`${
+                <Card className={`shadow-sm border ${
                   message.sender === 'user' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-card'
+                    ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600/20' 
+                    : 'bg-gradient-to-br from-white to-ocean-surface border-ocean-light/30'
                 }`}>
-                  <CardContent className="p-3">
-                    <p className="text-sm leading-relaxed">{message.content}</p>
+                  <CardContent className="p-4">
+                    {message.error ? (
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm leading-relaxed text-red-700">{message.content}</p>
+                          <p className="text-xs text-red-500 mt-1">Error: {message.error}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <MessageContent 
+                          content={message.content} 
+                          isBot={message.sender === 'bot'} 
+                        />
+                        {message.isStreaming && (
+                          <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-ocean-light/20">
+                            <Loader2 className="h-4 w-4 animate-spin text-ocean-primary" />
+                            <span className="text-sm text-ocean-primary font-medium">Analyzing oceanographic data...</span>
+                            <div className="flex space-x-1">
+                              <div className="w-1 h-1 bg-ocean-primary rounded-full animate-bounce"></div>
+                              <div className="w-1 h-1 bg-ocean-primary rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                              <div className="w-1 h-1 bg-ocean-primary rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     {message.type === 'visualization' && message.sender === 'bot' && (
                       <div className="mt-3 pt-3 border-t border-border">
@@ -173,15 +288,15 @@ const ChatBox = () => {
                           <span>Interactive Visualization Available</span>
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                          <Button variant="outline" size="sm" className="text-xs">
+                          <Button className="text-xs border border-gray-300 bg-white hover:bg-gray-50">
                             <Map className="h-3 w-3 mr-1" />
                             Map View
                           </Button>
-                          <Button variant="outline" size="sm" className="text-xs">
+                          <Button className="text-xs border border-gray-300 bg-white hover:bg-gray-50">
                             <TrendingUp className="h-3 w-3 mr-1" />
                             Charts
                           </Button>
-                          <Button variant="outline" size="sm" className="text-xs">
+                          <Button className="text-xs border border-gray-300 bg-white hover:bg-gray-50">
                             <Database className="h-3 w-3 mr-1" />
                             Data Table
                           </Button>
@@ -189,8 +304,11 @@ const ChatBox = () => {
                       </div>
                     )}
                     
-                    <div className="mt-2 text-xs opacity-70">
-                      {message.timestamp.toLocaleTimeString()}
+                    <div className="mt-3 pt-2 border-t border-ocean-light/20">
+                      <p className="text-xs text-ocean-deep/60 flex items-center">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -219,28 +337,39 @@ const ChatBox = () => {
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="border-t border-border p-4 bg-card">
-        <div className="flex space-x-2">
+      <div className="border-t border-ocean-light/30 p-4 bg-gradient-to-r from-ocean-surface to-white">
+        <div className="flex space-x-3">
           <Input
-            placeholder="Ask me about ocean data, temperatures, salinity, ARGO floats..."
+            placeholder="Ask me about specific ocean measurements, ARGO data, temperature profiles..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            className="flex-1"
+            className="flex-1 border-ocean-light/40 focus:border-ocean-primary focus:ring-ocean-primary/20 bg-white/80 backdrop-blur-sm"
             disabled={isLoading}
           />
           <Button 
             onClick={handleSendMessage} 
             disabled={!inputValue.trim() || isLoading}
-            variant="ocean"
-            size="icon"
+            className="bg-gradient-to-r from-ocean-primary to-blue-600 hover:from-blue-600 hover:to-ocean-primary text-white px-4 shadow-md transition-all duration-200"
           >
-            <Send className="h-4 w-4" />
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Press Enter to send. Ask about temperature, salinity, ARGO floats, or request visualizations.
-        </p>
+        <div className="flex items-center justify-between mt-3">
+          <p className="text-xs text-ocean-deep/70 flex items-center">
+            <Sparkles className="h-3 w-3 mr-1" />
+            Press Enter to send • Expert oceanographic analysis with real data
+          </p>
+          {conversationHistory.length > 1 && (
+            <p className="text-xs text-ocean-primary">
+              {calculateConversationTokens(conversationHistory)} tokens
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
