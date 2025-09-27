@@ -1,8 +1,11 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+// Minimal serverless function without extra type deps.
+// Avoids `@vercel/node` and `node-fetch` to keep build simple.
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 
-const fetchFn: typeof fetch = globalThis.fetch || (await import('node-fetch')).default;
+const fetchFn: typeof fetch = globalThis.fetch;
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+// Use loose types compatible with Vercel/Node runtime
+export default async function handler(req: Request & { body?: any }, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -42,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Streaming response handling
-    if (body && (body as any).stream && nvidiaResponse.body) {
+  if (body && (body as any).stream && nvidiaResponse.body) {
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
@@ -55,18 +58,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
-          res.write(chunk);
+          // Node-compatible res.write
+          if (typeof res.write === 'function') res.write(chunk);
         }
+      } catch (streamErr) {
+        // Propagate stream error
+        console.error('Stream error:', streamErr);
       } finally {
-        try { reader.releaseLock(); } catch (e) {}
         res.end();
       }
     } else {
       const data = await nvidiaResponse.json();
       res.status(200).json(data);
     }
-  } catch (err: any) {
+  } catch (err) {
+    // err may not be Error in some runtimes
+    const message = err && (err as any).message ? (err as any).message : String(err);
     console.error('Proxy error:', err);
-    res.status(502).json({ error: 'Proxy request failed', details: err.message });
+    res.status(502).json({ error: 'Proxy request failed', details: message });
   }
 }
