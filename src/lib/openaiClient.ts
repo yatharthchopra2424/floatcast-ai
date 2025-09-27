@@ -1,5 +1,11 @@
 // Proxy server configuration
-const PROXY_BASE_URL = 'http://localhost:3001';
+// Prefer environment override (Vercel): VITE_PROXY_URL should point to the full completions URL or base URL.
+const DEFAULT_BACKEND = 'https://floatcast-backend.vercel.app';
+const envProxy = import.meta.env.VITE_PROXY_URL;
+// Accept either full endpoint (https://host/api/chat/completions) or base (https://host)
+const PROXY_BASE_URL = envProxy
+  ? envProxy.replace(/\/$/, '')
+  : DEFAULT_BACKEND;
 
 // Ocean expert system prompt
 export const OCEAN_EXPERT_PROMPT = `You are an advanced AI oceanographer and marine data analyst with decades of expertise in ocean science. You have access to comprehensive ARGO float data, satellite observations, and historical oceanographic measurements from around the globe.
@@ -42,7 +48,11 @@ export async function streamChatCompletion(
   onChunk: (response: StreamingChatResponse) => void
 ): Promise<void> {
   try {
-    const response = await fetch(`${PROXY_BASE_URL}/api/chat/completions`, {
+    const endpoint = PROXY_BASE_URL.endsWith('/api/chat/completions')
+      ? PROXY_BASE_URL
+      : `${PROXY_BASE_URL}/api/chat/completions`;
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
