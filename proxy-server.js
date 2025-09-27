@@ -61,6 +61,6 @@ app.post('/api/chat/completions', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Proxy server running on http://localhost:${PORT}`);
-  console.log(`🔗 Proxying requests to NVIDIA API`);
+  console.log(`🚀 Local dev proxy server running on http://localhost:${PORT}`);
+  console.log(`🔗 This is a local helper only. For production, deploy the backend and set VITE_PROXY_URL accordingly.`);
 });

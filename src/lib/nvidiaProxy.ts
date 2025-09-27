@@ -1,6 +1,8 @@
 // Client helper to call the serverless proxy for NVIDIA chat completions
 export async function createChatCompletion(payload: any) {
-  const base = import.meta.env.VITE_PROXY_URL || 'https://floatcast-backend.vercel.app/api/chat/completions';
+  const base = import.meta.env.VITE_PROXY_URL;
+  if (!base) throw new Error('VITE_PROXY_URL is not set. Set it to your backend /api/chat/completions endpoint');
+
   const resp = await fetch(base, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

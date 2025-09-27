@@ -101,7 +101,9 @@ VITE_PROXY_URL=https://your-backend.example.com/api/chat/completions
 Example client-side call (frontend uses `VITE_PROXY_URL`):
 
 ```js
-const resp = await fetch(import.meta.env.VITE_PROXY_URL || '/api/chat/completions', {
+// Ensure VITE_PROXY_URL is set in your deployment/environment. The frontend
+// will read the full URL from import.meta.env.VITE_PROXY_URL at build time.
+const resp = await fetch(import.meta.env.VITE_PROXY_URL, {
    method: 'POST',
    headers: { 'Content-Type': 'application/json' },
    body: JSON.stringify({ model: 'openai/gpt-oss-20b', prompt: 'Hello', stream: false }),
