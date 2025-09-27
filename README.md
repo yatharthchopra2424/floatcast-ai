@@ -86,19 +86,28 @@ This application now uses a **proxy server architecture** to handle CORS issues 
 - Custom UI components for professional chat experience
 
 ### API Configuration (use server proxy)
-Client code should not include the API key. Instead, POST to the serverless proxy endpoint:
+Client code should not include the API key. Instead, POST to the serverless proxy endpoint.
+
+By default this frontend is configured to call the backend you deployed at:
+
+https://floatcast-backend.vercel.app/api/chat/completions
+
+You can override this by setting the `VITE_PROXY_URL` environment variable in Vercel (Project → Settings → Environment Variables):
+
+```text
+VITE_PROXY_URL=https://your-backend.example.com/api/chat/completions
+```
+
+Example client-side call (frontend uses `VITE_PROXY_URL`):
 
 ```js
-// Example client-side call
-const resp = await fetch('/api/chat/completions', {
+const resp = await fetch(import.meta.env.VITE_PROXY_URL || '/api/chat/completions', {
    method: 'POST',
    headers: { 'Content-Type': 'application/json' },
    body: JSON.stringify({ model: 'openai/gpt-oss-20b', prompt: 'Hello', stream: false }),
 });
 const data = await resp.json();
 ```
-
-The serverless function (deployed on Vercel) forwards the request to NVIDIA using the server-side `NVIDIA_API_KEY`.
 
 ### Model Settings
 - Model: `openai/gpt-oss-20b`
