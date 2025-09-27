@@ -1,6 +1,7 @@
 // Client helper to call the serverless proxy for NVIDIA chat completions
 export async function createChatCompletion(payload: any) {
-  const resp = await fetch('/api/chat/completions', {
+  const base = import.meta.env.VITE_PROXY_URL || '/api/chat/completions';
+  const resp = await fetch(base, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
