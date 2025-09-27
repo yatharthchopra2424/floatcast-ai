@@ -45,12 +45,20 @@ export interface StreamingChatResponse {
 // Function to send streaming chat request through proxy
 export async function streamChatCompletion(
   messages: ChatMessage[],
-  onChunk: (response: StreamingChatResponse) => void
+  onChunk: (response: StreamingChatResponse) => void,
+  opts?: { maxTokens?: number }
 ): Promise<void> {
   try {
     const endpoint = PROXY_BASE_URL.endsWith('/api/chat/completions')
       ? PROXY_BASE_URL
       : `${PROXY_BASE_URL}/api/chat/completions`;
+
+    // Determine max tokens: allow caller override, then env var, then default.
+    const envMax = Number(import.meta.env.VITE_MAX_TOKENS || 0) || 0;
+    const requestedMax = opts?.maxTokens || envMax || 4096;
+    // Enforce a safe cap to avoid abusive requests; adjust as needed.
+    const SAFE_CAP = 65536; // example large cap; upstream may enforce lower limits
+    const maxTokens = Math.min(requestedMax, SAFE_CAP);
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -64,7 +72,7 @@ export async function streamChatCompletion(
         messages: messages,
         temperature: 0.7,
         top_p: 1,
-        max_tokens: 4096,
+        max_tokens: maxTokens,
         stream: true
       })
     });
