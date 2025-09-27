@@ -17,12 +17,13 @@ A real-time chat application with an AI oceanographer that provides detailed oce
    npm install
    ```
 
-2. **Configure API Key**
+2. **Configure API Key (server-side)**
    - Get your NVIDIA API key from [https://build.nvidia.com/](https://build.nvidia.com/)
-   - Add it to `.env` file:
+   - For local development, create a `.env` file with the server-only variable:
    ```
-   VITE_NVIDIA_API_KEY=your_nvidia_api_key_here
+   NVIDIA_API_KEY=your_nvidia_api_key_here
    ```
+   - On Vercel, add `NVIDIA_API_KEY` in Project → Settings → Environment Variables (do NOT use `VITE_` prefix for server-only values).
 
 3. **Run the Application**
    
@@ -84,13 +85,20 @@ This application now uses a **proxy server architecture** to handle CORS issues 
 - `tokenManager.ts`: Conversation memory and token counting
 - Custom UI components for professional chat experience
 
-### API Configuration
-```typescript
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_NVIDIA_API_KEY,
-  baseURL: 'https://integrate.api.nvidia.com/v1',
+### API Configuration (use server proxy)
+Client code should not include the API key. Instead, POST to the serverless proxy endpoint:
+
+```js
+// Example client-side call
+const resp = await fetch('/api/chat/completions', {
+   method: 'POST',
+   headers: { 'Content-Type': 'application/json' },
+   body: JSON.stringify({ model: 'openai/gpt-oss-20b', prompt: 'Hello', stream: false }),
 });
+const data = await resp.json();
 ```
+
+The serverless function (deployed on Vercel) forwards the request to NVIDIA using the server-side `NVIDIA_API_KEY`.
 
 ### Model Settings
 - Model: `openai/gpt-oss-20b`

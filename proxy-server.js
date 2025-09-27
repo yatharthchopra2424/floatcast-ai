@@ -18,7 +18,7 @@ app.post('/api/chat/completions', async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.VITE_NVIDIA_API_KEY}`,
+      'Authorization': `Bearer ${process.env.NVIDIA_API_KEY || process.env.VITE_NVIDIA_API_KEY}`,
       },
       body: JSON.stringify(req.body),
     });
