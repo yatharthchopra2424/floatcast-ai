@@ -12,7 +12,7 @@
   ],
   "functions": {
     "api/**/*.[jt]s": {
-      "runtime": "nodejs18.x",
+      "runtime": "nodejs18",
       "maxDuration": 10
     }
   },
