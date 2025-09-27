@@ -10,12 +10,7 @@
       "dest": "/index.html"
     }
   ],
-  "functions": {
-    "api/**/*.[jt]s": {
-      "runtime": "nodejs18",
-      "maxDuration": 10
-    }
-  },
+  
   "installCommand": "pnpm install --no-frozen-lockfile || npm install",
   "buildCommand": "pnpm run build || npm run build"
 }
