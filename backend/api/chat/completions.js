@@ -32,6 +32,18 @@ export default async function handler(req, res) {
     const key = process.env.NVIDIA_API_KEY;
     if (!key) return res.status(500).json({ error: 'NVIDIA_API_KEY not configured on server' });
 
+    // Enforce server-side max_tokens cap to prevent abusive requests
+    const DEFAULT_CLIENT_MAX = 4096;
+    const capFromEnv = Number(process.env.BACKEND_MAX_TOKENS_CAP || 0) || 65536; // default server cap
+    const requestedTokens = typeof body.max_tokens === 'number' ? body.max_tokens : (Number(body.max_tokens) || DEFAULT_CLIENT_MAX);
+    const finalMaxTokens = Math.min(requestedTokens, capFromEnv);
+
+    // Prepare body forwarded to upstream (clone to avoid mutating req.body unexpectedly)
+    const forwardBody = Object.assign({}, body, { max_tokens: finalMaxTokens });
+    if (requestedTokens !== finalMaxTokens) {
+      console.warn(`Requested max_tokens=${requestedTokens} exceeds server cap=${capFromEnv}; capping to ${finalMaxTokens}`);
+    }
+
     // Allow overriding upstream base URL for testing/local setups
     const base = process.env.NVIDIA_BASE_URL || DEFAULT_NVIDIA_BASE;
     const upstreamUrl = `${base.replace(/\/$/, '')}/chat/completions`;
@@ -42,7 +54,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${key}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(forwardBody),
     });
 
     const text = await r.text();
