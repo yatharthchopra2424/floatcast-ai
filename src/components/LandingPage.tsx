@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ArrowRight, Bot, Database, Map, MessageCircle, TrendingUp, Waves } from "lucide-react";
 import { Link } from "react-router-dom";
+import FloatModel from "./FloatModel";
 
 const LandingPage = () => {
   const faqData = [
@@ -98,30 +100,37 @@ const LandingPage = () => {
 
       {/* Hero Section */}
       <section className="py-20 px-4">
-        <div className="container mx-auto text-center">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-6xl font-bold text-ocean-deep mb-6 leading-tight">
-              Discover Ocean Data with{" "}
-              <span className="bg-gradient-ocean bg-clip-text text-transparent">
-                Natural Language
-              </span>
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              FloatChat transforms complex ARGO ocean data into accessible insights. 
-              Ask questions in plain English and get interactive visualizations, 
-              charts, and clear answers powered by AI.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link to="/dashboard">
-                <Button variant="hero" size="lg">
-                  Start Exploring Data
-                  <MessageCircle className="ml-2 h-5 w-5" />
+        <div className="container mx-auto">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="text-center md:text-left">
+              <h1 className="text-5xl md:text-6xl font-bold text-ocean-deep mb-6 leading-tight">
+                Discover Ocean Data with{" "}
+                <span className="bg-gradient-ocean bg-clip-text text-transparent">
+                  Natural Language
+                </span>
+              </h1>
+              <p className="text-xl text-muted-foreground mb-8 max-w-2xl">
+                FloatChat transforms complex ARGO ocean data into accessible insights.
+                Ask questions in plain English and get interactive visualizations,
+                charts, and clear answers powered by AI.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start items-center">
+                <Link to="/dashboard">
+                  <Button variant="hero" size="lg">
+                    Start Exploring Data
+                    <MessageCircle className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Button variant="outline" size="lg">
+                  Watch Demo
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
-              </Link>
-              <Button variant="outline" size="lg">
-                Watch Demo
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              </div>
+            </div>
+            <div>
+              <Suspense fallback={<div>Loading 3D model...</div>}>
+                <FloatModel />
+              </Suspense>
             </div>
           </div>
         </div>
